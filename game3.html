@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <!-- 스타일 시트 정의 -->
+    <style>
+        * {
+            text-align: center;
+        }
+
+        #board {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #board tr td {
+            border: 1px solid white;
+            background: #34da79;
+            width: 16px;
+            height: 16px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        #board tr td.clicked {
+            background: #6c5ee7;
+        }
+
+        #board tr td.mine {
+            background: #FF0000;
+        }
+
+        #board tr td.safe {
+            background: #c3c3c3;
+        }
+
+        #board tr td.mine-found {
+            background: #3498db;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Minesweeper</h1>
+    <table id="board">
+    </table>
+
+    <button onclick="genGrid();">새로운 게임</button>
+
+    <script>
+        let grid = document.getElementById("board");
+
+        // 초기 변수 설정
+        let numRows = 16;
+        let numCols = 16;
+        let totalMines = 40;
+        let minesFound = 0;
+        let gameOver = false;
+        let firstClick = true;
+
+        // 게임 보드 생성 함수
+        function genGrid() {
+            grid.innerHTML = ""; //새 게임 시작시 게임판 초기화
+            minesFound = 0;
+            gameOver = false;
+            firstClick = true;
+            let mines = []; //지뢰 추적 배열
+
+            //게임판 생성
+            for (let i = 0; i < numRows; i++) {
+                let row = document.createElement("tr");
+
+                for (let j = 0; j < numCols; j++) {
+                    let cell = document.createElement("td");
+                    cell.setAttribute("data-mine", "false");
+                    cell.addEventListener("click", () => clickBox(cell));
+                    row.appendChild(cell);
+                }
+
+                grid.appendChild(row);
+            }
+        }
+
+        // 클릭 이벤트
+        function clickBox(cell) {
+            if (gameOver || cell.className === "clicked") return;
+
+            if (firstClick) { //첫 클릭시
+                firstClick = false;
+                placeMines(cell); //지뢰 설치
+            }
+
+            if (cell.getAttribute("data-mine") === "true") { //게임오버
+                cell.className = "mine";
+                alert("게임이 종료되었습니다.");
+                revealMines(); //지뢰 보여주기
+                gameOver = true;
+            } else {
+                let mineCount = countSurroundingMines(cell);//cell 주위의 지뢰 수 보여주기
+                cell.className = "safe";
+                cell.innerText = mineCount;
+                cell.classList.add("clicked");
+                if (mineCount === 0) { //주변에 지뢰 없을때 주위 보여주기
+                    revealEmptyCells(cell);
+                }
+            }
+
+            checkGameWin();
+        }
+
+        // 첫 클릭때 지뢰 배치 함수
+        function placeMines(initialCell) { //initialCell : 처음 시작한 셀
+            let mines = [];
+            while (mines.length < totalMines) { //40개까지 배치
+                let randRow = Math.floor(Math.random() * numRows);
+                let randCol = Math.floor(Math.random() * numCols);
+                let cell = grid.rows[randRow].cells[randCol];
+
+                if (cell.getAttribute("data-mine") === "false" /*현재 셀에 지뢰가 없고*/ && cell !== initialCell /*현재 셀이 초기위치가 아니라면 : 클릭위치 제외하여 지뢰설치*/) {
+                    cell.setAttribute("data-mine", "true"); // 현재 셀에 지뢰 속성 추가
+                    mines.push(cell);  // mines 배열에 현재 셀 추가 (지뢰가 위치한 셀을 추적하기 위해)  
+                }       
+            }
+            clickBox(initialCell);
+        }
+
+        // 지뢰가 터졌을때
+        function revealMines() {
+            let cells = document.querySelectorAll("[data-mine='true']"); //data-mine이 true, 즉 지뢰가 설치되어있는 셀 선택
+            cells.forEach((cell) => {
+                cell.className = "mine-found"; //선택된 셀을 드러내진 상태로
+                cell.innerText = "X"; //셀에 X
+            });
+        }
+
+        // 주변 지뢰 개수 세기 함수
+        function countSurroundingMines(cell) {
+            let mineCount = 0; //지뢰개수 초기화
+            let rowIndex = cell.parentNode.rowIndex; //현재 셀의 부모 행의 인덱스
+            let cellIndex = cell.cellIndex; //현재 셀의 인덱스
+            let surroundingCells = getSurroundingCells(rowIndex, cellIndex); //근접한 셀들
+
+            for (let i = 0; i < surroundingCells.length; i++) {
+                if (surroundingCells[i].getAttribute("data-mine") === "true") { //주변 셀에서 지뢰발견시 mineCount++
+                    mineCount++;
+                }
+            }
+
+            return mineCount; //주변 지뢰 수 반환
+        }
+
+        // 주변 셀 가져오기 함수
+        function getSurroundingCells(row, col) {
+            let cells = []; //셀 저장 배열
+
+            //행과 열을 순회하며 주변 셀 배열에 저장
+            for (let i = Math.max(0, row - 1); i <= Math.min(numRows - 1, row + 1); i++) {
+                for (let j = Math.max(0, col - 1); j <= Math.min(numCols - 1, col + 1); j++) {
+                    cells.push(grid.rows[i].cells[j]);
+                }
+            }
+
+            return cells;
+        }
+
+        // 빈 셀 표시 함수
+        function revealEmptyCells(cell) {
+            let rowIndex = cell.parentNode.rowIndex; //행 인덱스
+            let cellIndex = cell.cellIndex; //열 인덱스
+            let surroundingCells = getSurroundingCells(rowIndex, cellIndex); //주변 셀 가져오기
+
+            for (let i = 0; i < surroundingCells.length; i++) { //주변 셀마다 반복
+                if (!surroundingCells[i].classList.contains("clicked")) { //클릭된 상태가 아니라면 실행하기 
+                    clickBox(surroundingCells[i]); //클릭 처리
+                }
+            }
+        }
+
+        // 게임 승리 여부 확인
+        function checkGameWin() {
+            let cells = document.querySelectorAll("td");
+            let clickedCells = 0;
+
+            cells.forEach((cell) => { //모든 셀 반복
+                if (cell.classList.contains("clicked")) { //클릭됐다면
+                    clickedCells++;
+                }
+            });
+
+            if (clickedCells === numRows * numCols - totalMines) {//전체 판에서 지뢰빼고 모두 클릭시
+                alert("축하합니다! 게임에서 이겼습니다.");
+                gameOver = true;
+            }
+        }
+    </script> 
+</body>
+
+</html>
